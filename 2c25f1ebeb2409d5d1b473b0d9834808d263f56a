@@ -1,0 +1,19 @@
+The original proof-of-concept wasn't concurrent and was written in Python 3. It
+looked like this:
+
+from subprocess import check_output, CalledProcessError
+
+subdomains = ["or", "stimpy", "al", "pepe", "tweety", "anchor", "saranac",
+    "steelhead", "me", "dilbert", "krumm", "zippy", "mn", "calvin", "homer",
+    "bart", "felix", "astro", "ia", "il", "ca", "tx", "ren", "daffy", "wi",
+    "ickis"]
+
+for subdomain in subdomains:
+    try:
+        users = check_output(["ssh", subdomain + ".cs.wm.edu", "users"],
+                             universal_newlines=True)
+        users = users.strip().split()
+        print(users)
+        print("{}: {} users".format(subdomain, len(users)))
+    except (CalledProcessError, KeyboardInterrupt):
+        print("skipping {}".format(subdomain))
