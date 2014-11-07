@@ -73,12 +73,13 @@ func async_each(max_connections, timeout int, keyfile, placeholder, username str
 
 	for _, sd := range subdomains {
 		go run_one(sd, keyfile, placeholder, username, cmd)
+		// handle values here
 	}
 
 	time.Sleep(time.Duration(timeout) * time.Second)
 }
 
-func run_one(subdomain string, keyfile, placeholder, username string, command []string) {
+func run_one(subdomain string, keyfile, placeholder, username string, command []string) (to_stdout string) {
 
 	var precommand []string
 	if keyfile != "" {
@@ -96,18 +97,18 @@ func run_one(subdomain string, keyfile, placeholder, username string, command []
 	err := cmd.Run()
 
 	// collecting output
-	var s string
-	s += fmt.Sprintf("%-9v ", subdomain)
+	to_stdout += fmt.Sprintf("%-9v ", subdomain)
 	if err != nil {
-		s += fmt.Sprintln("failed!", err)
+		to_stdout += fmt.Sprintln("failed!", err)
 	}
-	s += fmt.Sprint(out.String())
+	to_stdout += fmt.Sprint(out.String())
 
 	// blit screen
 	if !strings.HasSuffix(s, "\n") {
-		s += placeholder + "\n"
+		to_stdout += placeholder + "\n"
 	}
-	fmt.Print(s)
+
+	return
 }
 
 func main() {
