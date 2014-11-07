@@ -102,7 +102,15 @@ func run_one(subdomain string, keyfile, placeholder, username string, command []
 	if keyfile != "" {
 		precommand = append(precommand, "-i", keyfile)
 	}
-	precommand = append(precommand, username+"@"+subdomain+".cs.wm.edu")
+
+	precommand = append(
+		precommand,
+		"-o",
+		"StrictHostKeyChecking=no",
+		"-o",
+		"UserKnownHostsFile=/dev/null",
+		username+"@"+subdomain+".cs.wm.edu",
+	)
 
 	// instantiating new command struct
 	cmd := exec.Command("ssh", append(precommand, command...)...)
