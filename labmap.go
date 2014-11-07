@@ -22,7 +22,7 @@ Options:
 	-k <keyfile>      location of private key
 	-s <connections>  maximum simultaneous connections [default: 8]
 	-c <command>      custom command to run
-	-t <timeout>      time (s.) to wait for responses [default: 5]
+	-t <timeout>      time (s.) to wait for responses [default: 4]
 	-p <placeholder>  what to print when command has no output
 	-v, --version     display version
 	-h, --help        display this screen
@@ -71,12 +71,29 @@ func async_each(max_connections, timeout int, keyfile, placeholder, username str
 		"ren", "saranac", "steelhead", "stimpy", "tweety", "tx", "wi", "zippy",
 	}
 
+	c_print := make(chan string)
+	c_conns := make(chan interface{}, max_connections)
+	c_timeout := time.After(time.Duration(timeout) * time.Second)
+
 	for _, sd := range subdomains {
-		go run_one(sd, keyfile, placeholder, username, cmd)
-		// handle values here
+		go func(sd string) {
+			c_conns <- true
+			c_print <- run_one(sd, keyfile, placeholder, username, cmd)
+			<-c_conns
+		}(sd)
 	}
 
-	time.Sleep(time.Duration(timeout) * time.Second)
+	for {
+		select {
+		case s := <-c_print:
+			fmt.Print(s)
+		case <-c_timeout:
+			close(c_conns)
+			close(c_print)
+			return
+		}
+	}
+
 }
 
 func run_one(subdomain string, keyfile, placeholder, username string, command []string) (to_stdout string) {
@@ -104,7 +121,7 @@ func run_one(subdomain string, keyfile, placeholder, username string, command []
 	to_stdout += fmt.Sprint(out.String())
 
 	// blit screen
-	if !strings.HasSuffix(s, "\n") {
+	if !strings.HasSuffix(to_stdout, "\n") {
 		to_stdout += placeholder + "\n"
 	}
 
