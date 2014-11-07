@@ -111,32 +111,42 @@ func run_one(subdomain string, keyfile, placeholder, username string, command []
 }
 
 func main() {
+
+	// pull option flags from CLI args
 	am := cli_args()
+	command_flag := am["-c"]
+	keyfile_flag := am["-k"]
+	placeh_flag := am["-p"]
 
-	var command []string
-	if am["-c"] != nil {
-		command = strings.Split(am["-c"].(string), " ")
-	} else {
-		command = []string{"echo", "\"$(users | wc -w) users\""}
-	}
-
-	var keyfile string
-	if am["-k"] != nil {
-		keyfile = am["-k"].(string)
-	}
-
+	// pull required and default arguments
+	// these will never be nil
 	username := am["<username>"].(string)
-
-	var placeholder string
-	if am["-p"] != nil {
-		placeholder = am["-p"].(string)
-	}
-
 	max_conn, err := strconv.Atoi(am["-s"].(string))
 	timeout, err := strconv.Atoi(am["-t"].(string))
 	if err != nil {
 		panic(err)
 	}
 
+	// get custom command or default to a user list
+	var command []string
+	if command_flag != nil {
+		command = strings.Split(command_flag.(string), " ")
+	} else {
+		command = []string{"echo", "\"$(users | wc -w) users\""}
+	}
+
+	// get keyfile if available; default to ''
+	var keyfile string
+	if keyfile_flag != nil {
+		keyfile = keyfile_flag.(string)
+	}
+
+	// get placeholder; default to ''
+	var placeholder string
+	if placeh_flag != nil {
+		placeholder = placeh_flag.(string)
+	}
+
+	// run asynchronous process spawner
 	async_each(max_conn, timeout, keyfile, placeholder, username, command)
 }
