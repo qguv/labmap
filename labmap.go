@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/docopt/docopt.go"
+	"github.com/howeyc/gopass"
+	"golang.org/x/crypto/ssh"
 	"os"
-	"os/exec"
-	"strconv"
-	"strings"
 	"time"
 )
 
-const VERSION string = "0.1.0"
+const VERSION string = "1.0.0"
 const USAGE string = "the LAB MAchine Probe v" + VERSION + `
 
 Usage:
@@ -19,11 +18,10 @@ Usage:
 	labmap -h | --help
 	
 Options:
-	-k <keyfile>      location of private key
-	-s <connections>  maximum simultaneous connections [default: 8]
+	-p <password>     override prompt and use this password
 	-c <command>      custom command to run
-	-t <timeout>      time (s.) to wait for responses [default: 4]
-	-p <placeholder>  what to print when command has no output
+	-d <downtime>     time to wait between connections [default: 0s]
+	-t <timeout>      time to wait for responses [default: 5s]
 	-v, --version     display version
 	-h, --help        display this screen
 
@@ -47,7 +45,7 @@ Examples:
 		$ labmap -c 'uptime' you
 
 	Displays names of connected users
-		$ labmap -c 'users' -p '-----' you`
+		$ labmap -c 'users' --placeholder '-----' you`
 
 func cli_args() map[string]interface{} {
 	m, err := docopt.Parse(
@@ -63,7 +61,7 @@ func cli_args() map[string]interface{} {
 	return m
 }
 
-func async_each(max_connections, timeout int, keyfile, placeholder, username string, cmd []string) {
+func async_each(timeout, downtime time.Duration, username, password, cmd string) {
 
 	subdomains := [...]string{
 		"al", "anchor", "astro", "bart", "ca", "calvin", "daffy", "dilbert",
@@ -71,6 +69,7 @@ func async_each(max_connections, timeout int, keyfile, placeholder, username str
 		"ren", "saranac", "steelhead", "stimpy", "tweety", "tx", "wi", "zippy",
 	}
 
+<<<<<<< HEAD
 	c_print := make(chan string)
 	c_conns := make(chan interface{}, max_connections)
 	c_timeout := time.After(time.Duration(timeout) * time.Second)
@@ -175,4 +174,83 @@ func main() {
 
 	// run asynchronous process spawner
 	async_each(max_conn, timeout, keyfile, placeholder, username, command)
+=======
+	ret := make(chan string)
+	for _, sd := range subdomains {
+		fmt.Println("Running on", sd)
+		go run_command(sd, username, password, cmd, ret)
+		time.Sleep(downtime)
+	}
+
+	abort := time.After(timeout)
+	for range subdomains {
+		select {
+		case m := <-ret:
+			fmt.Printf(m)
+		case <-abort:
+			fmt.Println("timed out")
+			return
+		}
+	}
+}
+
+func run_command(hostname, username, password, command string, ret chan string) {
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+		},
+	}
+	client, err := ssh.Dial("tcp", hostname+".cs.wm.edu:22", config)
+	if err != nil {
+		ret <- "Failed to dial: " + err.Error()
+		return
+	}
+
+	session, err := client.NewSession()
+	if err != nil {
+		panic("Failed to create session: " + err.Error())
+	}
+	defer session.Close()
+
+	var b bytes.Buffer
+	session.Stdout = &b
+	if err := session.Run(command); err != nil {
+		panic("Failed to run: " + err.Error())
+	}
+
+	ret <- hostname + ": " + b.String()
+}
+
+func main() {
+	opts := cli_args()
+	username := opts["<username>"].(string)
+
+	timeout, err := time.ParseDuration(opts["-t"].(string))
+	if err != nil {
+		panic(err)
+	}
+
+	downtime, err := time.ParseDuration(opts["-d"].(string))
+	if err != nil {
+		panic(err)
+	}
+
+	var command string
+	if opts["-c"] != nil {
+		command = opts["-c"].(string)
+	} else {
+		command = "echo \"$(users | wc -w) users\""
+	}
+
+	var password string
+	if opts["-p"] != nil {
+		password = opts["-p"].(string)
+	} else {
+		fmt.Printf("%s's Password: ", username)
+		password = string(gopass.GetPasswdMasked())
+	}
+
+	async_each(timeout, downtime, username, password, command)
+>>>>>>> overhaul with ssh library
 }
